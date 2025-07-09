@@ -57,18 +57,18 @@ const createCustomMarker = (priceRange: string) => {
 const createSmartClusterIcon = (cluster: any) => {
   const childCount = cluster.getChildCount();
   
-  // Simple clustering based on count (no hotel price access needed)
+  // Simple clustering based on count
   let size, color;
   
   if (childCount < 3) {
     size = 35;
-    color = '#3B82F6'; // Blue
+    color = '#60A5FA'; // Light Blue
   } else if (childCount < 6) {
     size = 45;
-    color = '#F59E0B'; // Orange
+    color = '#3B82F6'; // Medium blue
   } else {
     size = 55;
-    color = '#EF4444'; // Red
+    color = '#1D4ED8'; // Dark blue
   }
 
   return divIcon({
@@ -93,26 +93,14 @@ const createSmartClusterIcon = (cluster: any) => {
   });
 };
 
-// Components (StarRating, HotelCard, FilterPanel - same as before)
+// Components
 const StarRating: React.FC<StarRatingProps> = ({ rating, size = 16 }) => {
-  const fullStars = Math.floor(rating);
-  const hasHalfStar = rating % 1 >= 0.5;
-  
   return (
     <div className="star-rating">
-      {[...Array(5)].map((_, i) => (
-        <span 
-          key={i} 
-          className="star"
-          style={{ 
-            color: i < fullStars ? '#fbbf24' : i === fullStars && hasHalfStar ? '#fbbf24' : '#e5e7eb',
-            fontSize: `${size}px`
-          }}
-        >
-          ⭐
-        </span>
-      ))}
-      <span className="rating-value">{rating}</span>
+      <span style={{ color: '#fbbf24', fontSize: `${size}px`, marginRight: '4px' }}>
+        📊
+      </span>
+      <span className="rating-value">{rating}/10</span>
     </div>
   );
 };
@@ -292,15 +280,14 @@ const ClusteredHotelMap: React.FC = () => {
           </div>
           <div style={{ marginTop: '12px', fontSize: '11px', color: '#6b7280' }}>
             <div><strong>Clusters:</strong> Numbers show hotel count</div>
-            <div>🔵 Small (2-3 hotels)</div>
-            <div>🟡 Medium (4-6 hotels)</div>
-            <div>🔴 Large (7+ hotels)</div>
+            <div>💙 Light blue = Small clusters (2-3 hotels)</div>
+            <div>🔵 Medium blue = Medium clusters (4-6 hotels)</div>
+            <div>🟦 Dark blue = Large clusters (7+ hotels)</div>
             <div>Click clusters to zoom in</div>
           </div>
         </div>
       </div>
 
-      {/* Map with Clustering */}
       <div className="map-container">
         <MapContainer
           center={center}
@@ -313,7 +300,6 @@ const ClusteredHotelMap: React.FC = () => {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           />
           
-          {/* Marker Cluster Group - This is where the magic happens! */}
           <MarkerClusterGroup
             iconCreateFunction={createSmartClusterIcon}
             maxClusterRadius={80}
