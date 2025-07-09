@@ -2,167 +2,183 @@ import React, { useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import { divIcon } from 'leaflet';
-import { Star, MapPin, DollarSign, Users, Wifi, Car, Dumbbell, Waves, UtensilsCrossed, Wine, Flower2, Building } from 'lucide-react';
-import { Hotel, Filters, PriceRange, AmenityIconMap } from '../types';
+import 'leaflet/dist/leaflet.css';
+
+// Import hotel data from JSON file
 import hotelData from '../data/seattle_hotel_data.json';
 
-// Custom marker icon based on price range
-const createCustomIcon = (priceRange: PriceRange) => {
+// Import types and constants
+import { 
+  Hotel, 
+  Filters, 
+  HotelCardProps, 
+  FilterPanelProps, 
+  StarRatingProps,
+  PRICE_RANGE_LABELS,
+  PRICE_RANGE_OPTIONS,
+  AMENITY_ICONS
+} from '../types';
+
+// Import component styles
+import '../styles/HotelMap.css';
+
+// Utility functions
+const getPriceRange = (price: number): string => {
+  if (price < 800) return 'budget';
+  if (price < 1200) return 'mid';
+  return 'luxury';
+};
+
+const createCustomMarker = (priceRange: string) => {
   const colors = {
-    budget: '#10B981', // emerald-500
-    mid: '#F59E0B',    // amber-500
-    luxury: '#EF4444'  // red-500
+    budget: '#10B981',
+    mid: '#F59E0B',
+    luxury: '#EF4444'
   };
-  
+
+  const color = colors[priceRange as keyof typeof colors] || colors.mid;
+
   return divIcon({
-    html: `<div style="background-color: ${colors[priceRange]}; border: 3px solid white; border-radius: 50%; width: 20px; height: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+    html: `<div style="
+      background-color: ${color}; 
+      border: 3px solid white; 
+      border-radius: 50%; 
+      width: 20px; 
+      height: 20px; 
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    "></div>`,
     className: 'custom-marker-icon',
     iconSize: [20, 20],
     iconAnchor: [10, 10]
   });
 };
 
-// Get price range category
-const getPriceRange = (price: number | string): PriceRange => {
-  const numPrice = typeof price === 'string' ? parseFloat(price) : price;
-  if (numPrice < 800) return 'budget';
-  if (numPrice < 1200) return 'mid';
-  return 'luxury';
-};
+// Create custom cluster icon - Smart clustering based on hotel count
+const createSmartClusterIcon = (cluster: any) => {
+  const childCount = cluster.getChildCount();
+  
+  // Simple clustering based on count (no hotel price access needed)
+  let size, color;
+  
+  if (childCount < 3) {
+    size = 35;
+    color = '#3B82F6'; // Blue
+  } else if (childCount < 6) {
+    size = 45;
+    color = '#F59E0B'; // Orange
+  } else {
+    size = 55;
+    color = '#EF4444'; // Red
+  }
 
-// Amenity icons mapping
-const amenityIcons: AmenityIconMap = {
-  'WiFi': Wifi,
-  'Parking': Car,
-  'Gym': Dumbbell,
-  'Pool': Waves,
-  'Restaurant': UtensilsCrossed,
-  'Bar': Wine,
-  'Spa': Flower2,
-  'Business Center': Building
-};
-
-// Custom cluster icon
-const createClusterCustomIcon = (cluster: any) => {
   return divIcon({
-    html: `<div style="background-color: #3B82F6; color: white; border: 3px solid white; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">${cluster.getChildCount()}</div>`,
+    html: `<div style="
+      background-color: ${color}; 
+      color: white; 
+      border: 3px solid white; 
+      border-radius: 50%; 
+      width: ${size}px; 
+      height: ${size}px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      font-weight: bold; 
+      font-size: ${size > 40 ? '16px' : '14px'};
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      transition: all 0.3s ease;
+    ">${childCount}</div>`,
     className: 'custom-cluster-icon',
-    iconSize: [40, 40],
-    iconAnchor: [20, 20]
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2]
   });
 };
 
-// Star rating component
-interface StarRatingProps {
-  rating: number;
-  size?: number;
-}
-
+// Components (StarRating, HotelCard, FilterPanel - same as before)
 const StarRating: React.FC<StarRatingProps> = ({ rating, size = 16 }) => {
   const fullStars = Math.floor(rating);
   const hasHalfStar = rating % 1 >= 0.5;
   
   return (
-    <div className="flex items-center gap-1">
+    <div className="star-rating">
       {[...Array(5)].map((_, i) => (
-        <Star
-          key={i}
-          size={size}
-          className={`${
-            i < fullStars 
-              ? 'fill-yellow-400 text-yellow-400' 
-              : i === fullStars && hasHalfStar 
-                ? 'fill-yellow-200 text-yellow-400'
-                : 'fill-gray-200 text-gray-200'
-          }`}
-        />
+        <span 
+          key={i} 
+          className="star"
+          style={{ 
+            color: i < fullStars ? '#fbbf24' : i === fullStars && hasHalfStar ? '#fbbf24' : '#e5e7eb',
+            fontSize: `${size}px`
+          }}
+        >
+          ⭐
+        </span>
       ))}
-      <span className="ml-1 text-sm font-semibold">{rating}</span>
+      <span className="rating-value">{rating}</span>
     </div>
   );
 };
 
-// Hotel card component for popup
-interface HotelCardProps {
-  hotel: Hotel;
-}
-
 const HotelCard: React.FC<HotelCardProps> = ({ hotel }) => {
-  // Ensure price is a number for calculations
-  const price = typeof hotel.price_per_night === 'string' 
-    ? parseFloat(hotel.price_per_night) 
-    : hotel.price_per_night;
-  
-  const priceRange = getPriceRange(price);
-  const priceRangeLabels = {
-    budget: 'Budget Friendly',
-    mid: 'Mid Range',
-    luxury: 'Luxury'
-  };
+  const priceRange = getPriceRange(hotel.price_per_night);
 
   return (
-    <div className="max-w-sm bg-white rounded-lg overflow-hidden">
-      <div className="relative">
+    <div className="hotel-card">
+      <div className="hotel-image-container">
         <img 
           src={hotel.image_url} 
           alt={hotel.name}
-          className="w-full h-32 object-cover"
+          className="hotel-image"
           onError={(e) => {
             (e.target as HTMLImageElement).style.display = 'none';
           }}
         />
-        <div className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-bold text-white ${
-          priceRange === 'budget' ? 'bg-emerald-500' :
-          priceRange === 'mid' ? 'bg-amber-500' : 'bg-red-500'
-        }`}>
-          {priceRangeLabels[priceRange]}
+        <div className={`price-badge ${priceRange}`}>
+          {PRICE_RANGE_LABELS[priceRange as keyof typeof PRICE_RANGE_LABELS]}
         </div>
       </div>
       
-      <div className="p-4">
-        <div className="flex items-start justify-between mb-2">
-          <h3 className="font-bold text-lg leading-tight">{hotel.name}</h3>
-          <div className="flex">
+      <div className="hotel-card-content">
+        <div className="hotel-header">
+          <h3 className="hotel-name">{hotel.name}</h3>
+          <div className="hotel-stars">
             {[...Array(hotel.star_rating)].map((_, i) => (
-              <Star key={i} size={12} className="fill-yellow-400 text-yellow-400" />
+              <span key={i} className="star">⭐</span>
             ))}
           </div>
         </div>
         
-        <div className="flex items-center gap-1 text-gray-600 mb-2">
-          <MapPin size={14} />
-          <span className="text-sm">{hotel.address}</span>
+        <div className="hotel-address">
+          <span>📍</span>
+          <span>{hotel.address}</span>
         </div>
         
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-1">
-            <DollarSign size={16} className="text-green-600" />
-            <span className="font-bold text-lg">${price}</span>
-            <span className="text-gray-500 text-sm">/night</span>
+        <div className="hotel-pricing">
+          <div className="price-container">
+            <span className="price-icon">💰</span>
+            <span className="price-amount">${hotel.price_per_night}</span>
+            <span className="price-period">/night</span>
           </div>
           <StarRating rating={hotel.rating} />
         </div>
         
-        <div className="text-sm text-gray-600 mb-3">
-          <div>{hotel.room_type}</div>
-          <div className="flex items-center gap-1 mt-1">
-            <Users size={14} />
+        <div className="hotel-details">
+          <div className="room-type">{hotel.room_type}</div>
+          <div className="review-info">
+            <span>👥</span>
             <span>{hotel.review_count} reviews</span>
           </div>
         </div>
         
-        <div className="border-t pt-3">
-          <h4 className="font-semibold text-sm mb-2">Amenities</h4>
-          <div className="grid grid-cols-4 gap-2">
-            {hotel.amenities.slice(0, 8).map((amenity, index) => {
-              const IconComponent = amenityIcons[amenity];
-              return (
-                <div key={index} className="flex flex-col items-center text-xs">
-                  {IconComponent && <IconComponent size={16} className="text-blue-600 mb-1" />}
-                  <span className="text-center leading-tight">{amenity}</span>
-                </div>
-              );
-            })}
+        <div className="amenities-section">
+          <h4 className="amenities-title">Amenities</h4>
+          <div className="amenities-grid">
+            {hotel.amenities.slice(0, 8).map((amenity, index) => (
+              <div key={index} className="amenity-item">
+                <span className="amenity-icon">
+                  {AMENITY_ICONS[amenity as keyof typeof AMENITY_ICONS] || '✓'}
+                </span>
+                <span className="amenity-text">{amenity}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -170,44 +186,32 @@ const HotelCard: React.FC<HotelCardProps> = ({ hotel }) => {
   );
 };
 
-// Filters component
-interface FiltersProps {
-  filters: Filters;
-  onFilterChange: (filters: Filters) => void;
-}
-
-const FiltersComponent: React.FC<FiltersProps> = ({ filters, onFilterChange }) => {
-  const priceRanges = [
-    { value: 'all', label: 'All Prices', color: 'bg-gray-500' },
-    { value: 'budget', label: 'Budget (<$800)', color: 'bg-emerald-500' },
-    { value: 'mid', label: 'Mid Range ($800-$1200)', color: 'bg-amber-500' },
-    { value: 'luxury', label: 'Luxury (>$1200)', color: 'bg-red-500' }
-  ];
-
+const FilterPanel: React.FC<FilterPanelProps> = ({ filters, onFilterChange }) => {
   return (
-    <div className="absolute top-4 left-4 z-[1000] bg-white rounded-lg shadow-lg p-4 max-w-xs">
-      <h3 className="font-bold text-lg mb-3">Filter Hotels</h3>
+    <div className="filter-panel">
+      <h3 className="filter-title">Filter Hotels</h3>
       
-      <div className="space-y-2">
-        <label className="block text-sm font-medium">Price Range</label>
-        {priceRanges.map(range => (
-          <label key={range.value} className="flex items-center gap-2 cursor-pointer">
+      <div className="filter-section">
+        <label className="filter-label">Price Range</label>
+        {PRICE_RANGE_OPTIONS.map(range => (
+          <label key={range.value} className="filter-option">
             <input
               type="radio"
               name="priceRange"
               value={range.value}
               checked={filters.priceRange === range.value}
               onChange={(e) => onFilterChange({ ...filters, priceRange: e.target.value as any })}
-              className="sr-only"
             />
-            <div className={`w-4 h-4 rounded-full ${range.color} ${filters.priceRange === range.value ? 'ring-2 ring-offset-2 ring-blue-500' : ''}`} />
-            <span className="text-sm">{range.label}</span>
+            <div className={`filter-radio-button ${range.value} ${filters.priceRange === range.value ? 'active' : ''}`} />
+            <span className="filter-option-text">{range.label}</span>
           </label>
         ))}
       </div>
       
-      <div className="mt-4">
-        <label className="block text-sm font-medium mb-2">Minimum Rating</label>
+      <div>
+        <label className="filter-label">
+          Minimum Rating: {filters.minRating}
+        </label>
         <input
           type="range"
           min="7"
@@ -215,11 +219,10 @@ const FiltersComponent: React.FC<FiltersProps> = ({ filters, onFilterChange }) =
           step="0.1"
           value={filters.minRating}
           onChange={(e) => onFilterChange({ ...filters, minRating: parseFloat(e.target.value) })}
-          className="w-full"
+          className="rating-slider"
         />
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
+        <div className="rating-range-labels">
           <span>7.0</span>
-          <span className="font-medium">{filters.minRating}</span>
           <span>9.5</span>
         </div>
       </div>
@@ -227,72 +230,81 @@ const FiltersComponent: React.FC<FiltersProps> = ({ filters, onFilterChange }) =
   );
 };
 
-// Main Hotel Discovery Map component
-const HotelDiscoveryMap: React.FC = () => {
+// Main Component with Clustering
+const ClusteredHotelMap: React.FC = () => {
   const [filters, setFilters] = useState<Filters>({
     priceRange: 'all',
     minRating: 7.0
   });
 
-  // Filter hotels based on current filters
-  const filteredHotels = (hotelData as Hotel[]).filter((hotel) => {
-    // Ensure price_per_night is a number for comparison
-    const price = typeof hotel.price_per_night === 'string' 
-      ? parseFloat(hotel.price_per_night) 
-      : hotel.price_per_night;
-    
-    const priceRange = getPriceRange(price);
+  // Type assertion for imported JSON data
+  const hotels = hotelData as Hotel[];
+  
+  // Debug log to verify import
+  console.log('Imported hotel data with clustering:', hotels.length, 'hotels');
+
+  const filteredHotels = hotels.filter((hotel) => {
+    const priceRange = getPriceRange(hotel.price_per_night);
     const matchesPrice = filters.priceRange === 'all' || priceRange === filters.priceRange;
     const matchesRating = hotel.rating >= filters.minRating;
     return matchesPrice && matchesRating;
   });
 
-  // Seattle downtown center coordinates
   const center: [number, number] = [47.61322, -122.33582];
 
   return (
-    <div className="relative w-full h-screen">
+    <div className="hotel-map-container">
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-[1000] bg-gradient-to-r from-blue-600 to-blue-800 text-white p-4 shadow-lg">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+      <div className="hotel-map-header">
+        <div className="hotel-map-header-content">
           <div>
-            <h1 className="text-2xl font-bold">Seattle Hotel Discovery</h1>
-            <p className="text-blue-100">Find the perfect hotel for your conference stay</p>
+            <h1 className="hotel-map-title">Seattle Hotel Discovery</h1>
+            <p className="hotel-map-subtitle">Find the perfect hotel for your conference stay • With Smart Clustering</p>
           </div>
-          <div className="text-right">
-            <div className="text-lg font-semibold">{filteredHotels.length} hotels found</div>
-            <div className="text-blue-200 text-sm">Downtown Seattle</div>
+          <div className="hotel-map-stats">
+            <div className="hotel-count">{filteredHotels.length} hotels found</div>
+            <div className="hotel-location">Downtown Seattle ({hotels.length} total)</div>
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <FiltersComponent filters={filters} onFilterChange={setFilters} />
+      <FilterPanel filters={filters} onFilterChange={setFilters} />
 
-      {/* Legend */}
-      <div className="absolute top-4 right-4 z-[1000] bg-white rounded-lg shadow-lg p-4">
-        <h4 className="font-bold text-sm mb-2">Price Legend</h4>
-        <div className="space-y-1 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
+      {/* Enhanced Legend */}
+      <div className="legend-panel">
+        <h4 className="legend-title">Map Legend</h4>
+        <div className="legend-items">
+          <div style={{ marginBottom: '12px' }}>
+            <strong style={{ fontSize: '12px' }}>Hotel Prices:</strong>
+          </div>
+          <div className="legend-item">
+            <div className="legend-color budget"></div>
             <span>Budget (&lt;$800)</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-amber-500 rounded-full"></div>
+          <div className="legend-item">
+            <div className="legend-color mid"></div>
             <span>Mid Range ($800-$1200)</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+          <div className="legend-item">
+            <div className="legend-color luxury"></div>
             <span>Luxury (&gt;$1200)</span>
+          </div>
+          <div style={{ marginTop: '12px', fontSize: '11px', color: '#6b7280' }}>
+            <div><strong>Clusters:</strong> Numbers show hotel count</div>
+            <div>🔵 Small (2-3 hotels)</div>
+            <div>🟡 Medium (4-6 hotels)</div>
+            <div>🔴 Large (7+ hotels)</div>
+            <div>Click clusters to zoom in</div>
           </div>
         </div>
       </div>
 
-      {/* Map */}
-      <div className="w-full h-full pt-20">
+      {/* Map with Clustering */}
+      <div className="map-container">
         <MapContainer
           center={center}
-          zoom={14}
+          zoom={13}
           style={{ height: '100%', width: '100%' }}
           className="z-0"
         >
@@ -301,33 +313,27 @@ const HotelDiscoveryMap: React.FC = () => {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           />
           
+          {/* Marker Cluster Group - This is where the magic happens! */}
           <MarkerClusterGroup
-            iconCreateFunction={createClusterCustomIcon}
-            maxClusterRadius={50}
+            iconCreateFunction={createSmartClusterIcon}
+            maxClusterRadius={80}
             spiderfyOnMaxZoom={true}
             showCoverageOnHover={false}
+            zoomToBoundsOnClick={true}
+            spiderfyDistanceMultiplier={2}
+            animateAddingMarkers={true}
           >
-            {filteredHotels.map((hotel: Hotel) => {
-              const price = typeof hotel.price_per_night === 'string' 
-                ? parseFloat(hotel.price_per_night) 
-                : hotel.price_per_night;
-              
-              return (
-                <Marker
-                  key={hotel.hotel_id}
-                  position={[hotel.latitude, hotel.longitude]}
-                  icon={createCustomIcon(getPriceRange(price))}
-                >
-                  <Popup
-                    maxWidth={350}
-                    closeButton={true}
-                    className="custom-popup"
-                  >
-                    <HotelCard hotel={hotel} />
-                  </Popup>
-                </Marker>
-              );
-            })}
+            {filteredHotels.map((hotel) => (
+              <Marker
+                key={hotel.hotel_id}
+                position={[hotel.latitude, hotel.longitude]}
+                icon={createCustomMarker(getPriceRange(hotel.price_per_night))}
+              >
+                <Popup maxWidth={370} closeButton={true}>
+                  <HotelCard hotel={hotel} />
+                </Popup>
+              </Marker>
+            ))}
           </MarkerClusterGroup>
         </MapContainer>
       </div>
@@ -335,4 +341,4 @@ const HotelDiscoveryMap: React.FC = () => {
   );
 };
 
-export default HotelDiscoveryMap;
+export default ClusteredHotelMap;
