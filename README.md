@@ -2,6 +2,8 @@
 
 An interactive hotel discovery platform for conference attendees in downtown Seattle. Built with React, TypeScript, and Leaflet for an optimal user experience.
 
+For Best experience, please use a Desktop Browser.
+
 ## 🌟 Features
 
 - **Interactive Map**: Powered by Leaflet with smooth pan and zoom
