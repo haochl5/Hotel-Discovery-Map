@@ -247,7 +247,7 @@ const ClusteredHotelMap: React.FC = () => {
         <div className="hotel-map-header-content">
           <div>
             <h1 className="hotel-map-title">Seattle Hotel Discovery</h1>
-            <p className="hotel-map-subtitle">Find the perfect hotel for your conference stay • With Smart Clustering</p>
+            <p className="hotel-map-subtitle">Find the perfect hotel for your conference stay </p>
           </div>
           <div className="hotel-map-stats">
             <div className="hotel-count">{filteredHotels.length} hotels found</div>
